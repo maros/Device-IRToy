@@ -3,6 +3,7 @@ package Device::IRToy {
     use Moose;
     use Time::HiRes qw(usleep);
     use Carp qw(croak);
+    use List::Util qw(min);
     
     our $SLEEP_USECONDS = 5000;
     our $SCALE = 21.33333;
@@ -134,6 +135,7 @@ package Device::IRToy {
             $self->fatal('Transmit data must be even sized list with a minimum of two bytes');
         }
         
+        # End data
         unless ($data[-2] eq 0xff 
             && $data[-1] eq 0xff) {
             push(@data,0xff,0xff);
@@ -144,30 +146,39 @@ package Device::IRToy {
         usleep($SLEEP_USECONDS);
         
         $self->write_raw(
-            0x26,   # enable handshake
-            0x25,   # enable notify on transmit
             0x24,   # enable transmit byte count
+            0x25,   # enable notify on transmit
+            0x26,   # enable handshake
             0x03,   # start transmission
         );
         
-        usleep($SLEEP_USECONDS);
+        while (scalar @data) {
+            # Read handshake
+            my $buffer_size = $self->read_raw(bytes => 1);
+            $buffer_size = ord($buffer_size);
+            
+            my @block = splice @data,0,$buffer_size;
+            
+            my $block_size = min($buffer_size,scalar @block);
+            $self->log('DEBUG','Transmit %i bytes',$block_size);
+            
+            $self->write_raw(@block);
+        }
         
-        my $bytes =  $self->write_raw(@data);
-#        while (scalar @data) {
-#            $self->log('DEBUG','Loop block');
-#            my @send = splice @data,0,32;
-#            $bytes += $self->write_raw(@send);
-#            #my $handshake = ord($self->read_raw(bytes => 1));
-#            #say "HANDSHAKE: $handshake";
-#        }
+        # Read left over handshake
+        $self->read_raw(bytes => 1);
         
-        usleep($SLEEP_USECONDS);
+        # Read transmit count and complete notify
+        my $transmit_report = $self->read_raw(bytes => 4);
         
-        $self->log('DEBUG','Get report');
-        my $report = $self->read_raw(bytes => 1);
-        
-        unless (lc($report) eq 'c') {
-            $self->log('ERROR','Could not transmit IR code Report: %s',$report);
+        if ($transmit_report =~ m/^t(..)([CF])$/) {
+            if ($2 eq 'C') {
+                $self->log('INFO','Successfully transmitted ir code');
+            } elsif ($2 eq 'F') {
+                $self->fatal('Buffer underrun during transmit');
+            }
+        } else {
+            $self->fatal('Could not parse transmit report: %s',$transmit_report);
         }
         
         $self->sampling_mode();
@@ -176,17 +187,15 @@ package Device::IRToy {
     sub write_raw {
         my ($self,@data) = @_;
         
-        my $total = scalar @data;
-        my $bytes = 0;#
-    
-        while (scalar @data) {
-            my @send = splice @data,0,32;
-            my $send = pack( "a" x scalar @send, (map { pack( "C", $_ & 0xff ) } @send));
-            $self->log('DEBUG','About to write %i bytes',scalar(@send));
-            $bytes += $self->serial->write( $send );
-        }
+        my $send = pack( 
+            "a" x scalar @data, 
+            (map { pack( "C", $_ & 0xff ) } @data)
+        );
         
-        unless ($total == $bytes) {
+        $self->log('DEBUG','About to write %i bytes',scalar(@data));
+        my $bytes = $self->serial->write( $send );
+        
+        unless (scalar @data == $bytes) {
             $self->fatal('Incorrect number of bytes written. Expected %i, got',scalar @data,$bytes);
         }
         return $bytes;
@@ -218,9 +227,11 @@ package Device::IRToy {
                     $self->log('DEBUG','Got 0xff - ignoring');
                     $errorcount++;
                     if ($errorcount >= 6) {
-                        $self->log('WARN','Read timeout');
+                        $self->fatal('Read error');
                     }
                     next;
+                } else {
+                    $errorcount = 0;
                 }
                 #say "READ ".$read_byte;
                 say '_'.unpack("C",$read_byte);
