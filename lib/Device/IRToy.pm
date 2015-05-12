@@ -5,6 +5,8 @@ package Device::IRToy {
     use Carp qw(croak);
     use List::Util qw(min);
     
+    use Device::IRToy::Utils;
+    
     our $SLEEP_USECONDS = 5000;
     our $SCALE = 21.33333;
     
@@ -29,23 +31,10 @@ package Device::IRToy {
         predicate       => 'has_serial',
     );
     
-    sub log {
-        my ($self,$loglevel,$message,@sprintf) = @_;
-        $message = sprintf($message,@sprintf);
-        say '['.$loglevel.'] '.$message;
-        return $message;
-    }
-    
-    sub fatal {
-        my ($self,@message) = @_;
-        my $message = $self->log('FATAL',@message);
-        croak $message;
-    }
-    
     sub DEMOLISH {
         my ($self) = @_;
         if ($self->has_serial) {
-            $self->log('INFO','Closing serial port');
+            log('INFO','Closing serial port');
             $self->serial->close();
         }
     }
@@ -57,11 +46,11 @@ package Device::IRToy {
         if ($^O eq 'MSWin32') {
             require Win32::SerialPort;
             $serial = new Win32::SerialPort($self->port)
-                or $self->fatal("Can't open serial port! Win32::SerialPort(".$self->port.")");
+                or fatal("Can't open serial port! Win32::SerialPort(".$self->port.")");
         } else {
             require Device::SerialPort;
             $serial = new Device::SerialPort($self->port)
-                or $self->fatal("Can't open serial port! Device::SerialPort(".$self->port.")");
+                or fatal("Can't open serial port! Device::SerialPort(".$self->port.")");
         }
         
         $serial->baudrate( $self->baudrate );
@@ -74,9 +63,9 @@ package Device::IRToy {
         $serial->read_char_time(10);
         $serial->read_const_time(25);
         $serial->write_settings 
-            or $self->fatal("Can't initialise serial port settings");
+            or fatal("Can't initialise serial port settings");
         
-        $self->log('INFO','Initialized serial port');
+        log('INFO','Initialized serial port');
         
         return $serial;
     }
@@ -85,7 +74,7 @@ package Device::IRToy {
     # sends commands to reset USBIRToy
     sub reset {
         my ($self) = @_;
-        $self->log('INFO','Run reset');
+        log('INFO','Run reset');
         $self->write_raw((0x00) x 5);
     }
     
@@ -95,17 +84,17 @@ package Device::IRToy {
         
         $self->reset();
         
-        $self->log('INFO','Initializing sampling mode');
+        log('INFO','Initializing sampling mode');
         $self->write_raw( ord('s') );
         usleep($SLEEP_USECONDS);
         
-        my $res = $self->read_raw(bytes => 3);
+        my $res = $self->read_raw(bytes => 3, timeout => 2000);
         if ( defined $res 
             && $res =~ /S(\d\d)$/ ) {
-            $self->log('DEBUG','Initialized sampling mode: API version %s',$res);
+            log('DEBUG','Initialized sampling mode: API version %s',$res);
             return 1;
         } else {
-            $self->fatal('Could not initialize sampling mode');
+            fatal('Could not initialize sampling mode');
         }
         return 0;
     }
@@ -119,11 +108,11 @@ package Device::IRToy {
         usleep($SLEEP_USECONDS);
         my $version = $self->read_raw(bytes => 4);
         if ($version =~ /^V(\d)(\d\d)$/) {
-            $self->log('WARN','Version 22 is recommended. This is only %i',$2)
+            log('WARN','Version 22 is recommended. This is only %i',$2)
                 if $2 < 22;
             return ($1,$2);
         } else {
-            $self->fatal('Could not read version');
+            fatal('Could not read version');
         }
     }
     
@@ -132,7 +121,7 @@ package Device::IRToy {
         
         if (scalar @data < 2
             || scalar @data % 2 != 0) {
-            $self->fatal('Transmit data must be even sized list with a minimum of two bytes');
+            fatal('Transmit data must be even sized list with a minimum of two bytes');
         }
         
         # End data
@@ -141,7 +130,7 @@ package Device::IRToy {
             push(@data,0xff,0xff);
         }
         
-        $self->log('DEBUG','About to transmit %i bytes',scalar(@data));
+        log('DEBUG','About to transmit %i bytes',scalar(@data));
         
         usleep($SLEEP_USECONDS);
         
@@ -160,7 +149,7 @@ package Device::IRToy {
             my @block = splice @data,0,$buffer_size;
             
             my $block_size = min($buffer_size,scalar @block);
-            $self->log('DEBUG','Transmit %i bytes',$block_size);
+            log('DEBUG','Transmit %i bytes',$block_size);
             
             $self->write_raw(@block);
         }
@@ -173,12 +162,12 @@ package Device::IRToy {
         
         if ($transmit_report =~ m/^t(..)([CF])$/) {
             if ($2 eq 'C') {
-                $self->log('INFO','Successfully transmitted ir code');
+                log('INFO','Successfully transmitted ir code');
             } elsif ($2 eq 'F') {
-                $self->fatal('Buffer underrun during transmit');
+                fatal('Buffer underrun during transmit');
             }
         } else {
-            $self->fatal('Could not parse transmit report: %s',$transmit_report);
+            fatal('Could not parse transmit report: %s',$transmit_report);
         }
         
         $self->sampling_mode();
@@ -192,11 +181,11 @@ package Device::IRToy {
             (map { pack( "C", $_ & 0xff ) } @data)
         );
         
-        $self->log('DEBUG','About to write %i bytes',scalar(@data));
+        log('DEBUG','About to write %i bytes',scalar(@data));
         my $bytes = $self->serial->write( $send );
         
         unless (scalar @data == $bytes) {
-            $self->fatal('Incorrect number of bytes written. Expected %i, got',scalar @data,$bytes);
+            fatal('Incorrect number of bytes written. Expected %i, got',scalar @data,$bytes);
         }
         return $bytes;
     }
@@ -211,30 +200,30 @@ package Device::IRToy {
         my $data = '';
         my $errorcount = 0;
         
-        $self->log('DEBUG','About to read data');
+        log('DEBUG','About to read data');
         while ( my ( $read_ok, $read_byte ) = $self->serial->read(1) ) {
             if ( $read_ok == 0 ) {
                 if ($data ne '') {
                     last;
                 } elsif ( $loopcount++ > $tries) {
-                    $self->log('DEBUG','Read timeout');
+                    log('DEBUG','Read timeout');
                     return;
                 }
                 usleep(100);
             } else {
                 if (defined $params{bytes}
                     && ord($read_byte) == 0xff) {
-                    $self->log('DEBUG','Got 0xff - ignoring');
+                    log('DEBUG','Got 0xff - ignoring');
                     $errorcount++;
                     if ($errorcount >= 6) {
-                        $self->fatal('Read error');
+                        fatal('Read error');
                     }
                     next;
                 } else {
                     $errorcount = 0;
                 }
                 #say "READ ".$read_byte;
-                say '_'.unpack("C",$read_byte);
+                #say '_'.unpack("C",$read_byte);
                 $data .= $read_byte;
                 if (defined $params{bytes}
                     && length($data) >= $params{bytes}) {
@@ -242,7 +231,7 @@ package Device::IRToy {
                 }
             }
         }
-        $self->log('DEBUG','Read %s',$data);
+        log('DEBUG','Read %s',$data);
         return $data;
     }
     
