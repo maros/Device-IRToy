@@ -237,7 +237,7 @@ package Device::IRToy {
         return $data;
     }
     
-    sub read {
+    sub recieve {
         my ($self,%params) = @_;
         
         my $data = $self->read_raw(%params);
@@ -249,7 +249,16 @@ package Device::IRToy {
             my ($hb,$lb) = split (//,substr($data,0,2,''));
             push(@return,ord($hb)*(2**8)+ord($lb));
         }
-        return @return;
+        
+        if (defined $params{protocol}) {
+            my $protocol = $params{protocol};
+            $protocol = 'Device::IRToy::Protocol::'.$protocol
+                unless $protocol =~ /::/;
+            Class::Load::load_class($protocol);
+            msg('DEBUG','Try to decode via %s',$protocol);
+            return $protocol->decode(\@return);
+        }
+        return \@return;
     }
     __PACKAGE__->meta->make_immutable();
 }
