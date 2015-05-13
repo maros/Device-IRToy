@@ -107,8 +107,10 @@ package Device::IRToy {
         $self->write_raw( ord('v') );
         usleep($SLEEP_USECONDS);
         my $version = $self->read_raw(bytes => 4);
-        if ($version =~ /^V(\d)(\d\d)$/) {
-            log('WARN','Version 22 is recommended. This is only %i',$2)
+        
+        if (defined $version 
+            && $version =~ /^V(\d)(\d\d)$/) {
+            msg('WARN','Version 22 is recommended. This is only %i',$2)
                 if $2 < 22;
             return ($1,$2);
         } else {
