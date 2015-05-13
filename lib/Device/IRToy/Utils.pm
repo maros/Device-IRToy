@@ -4,24 +4,30 @@ package Device::IRToy::Utils {
     
     use Exporter;
     our @ISA = qw(Exporter);
-    our @EXPORT = qw(log fatal);
-    our @EXPORT_OK = qw(check_fuzzy);
+    our @EXPORT = qw(msg fatal);
+    our @EXPORT_OK = qw(check_fuzzy round);
+    
+    use Carp qw(croak);
     
     sub check_fuzzy {
         my ( $v, $c, $fuzz ) = @_;
         return ( $v < ( $c + $fuzz ) && $v > ( $c - $fuzz ) );
     }
     
-    sub log {
-        my ($self,$loglevel,$message,@sprintf) = @_;
+    sub msg {
+        my ($loglevel,$message,@sprintf) = @_;
         $message = sprintf($message,@sprintf);
         say '['.$loglevel.'] '.$message;
         return $message;
     }
     
     sub fatal {
-        my ($self,@message) = @_;
-        my $message = $self->log('FATAL',@message);
+        my (@message) = @_;
+        my $message = msg('FATAL',@message);
         croak $message;
+    }
+    
+    sub round {
+        return int($_[0] + 0.5);
     }
 }

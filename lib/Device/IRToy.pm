@@ -34,7 +34,7 @@ package Device::IRToy {
     sub DEMOLISH {
         my ($self) = @_;
         if ($self->has_serial) {
-            log('INFO','Closing serial port');
+            msg('INFO','Closing serial port');
             $self->serial->close();
         }
     }
@@ -65,7 +65,7 @@ package Device::IRToy {
         $serial->write_settings 
             or fatal("Can't initialise serial port settings");
         
-        log('INFO','Initialized serial port');
+        msg('INFO','Initialized serial port');
         
         return $serial;
     }
@@ -74,7 +74,7 @@ package Device::IRToy {
     # sends commands to reset USBIRToy
     sub reset {
         my ($self) = @_;
-        log('INFO','Run reset');
+        msg('INFO','Run reset');
         $self->write_raw((0x00) x 5);
     }
     
@@ -84,14 +84,14 @@ package Device::IRToy {
         
         $self->reset();
         
-        log('INFO','Initializing sampling mode');
+        msg('INFO','Initializing sampling mode');
         $self->write_raw( ord('s') );
         usleep($SLEEP_USECONDS);
         
         my $res = $self->read_raw(bytes => 3, timeout => 2000);
         if ( defined $res 
             && $res =~ /S(\d\d)$/ ) {
-            log('DEBUG','Initialized sampling mode: API version %s',$res);
+            msg('DEBUG','Initialized sampling mode: API version %s',$res);
             return 1;
         } else {
             fatal('Could not initialize sampling mode');
@@ -130,7 +130,7 @@ package Device::IRToy {
             push(@data,0xff,0xff);
         }
         
-        log('DEBUG','About to transmit %i bytes',scalar(@data));
+        msg('DEBUG','About to transmit %i bytes',scalar(@data));
         
         usleep($SLEEP_USECONDS);
         
@@ -149,7 +149,7 @@ package Device::IRToy {
             my @block = splice @data,0,$buffer_size;
             
             my $block_size = min($buffer_size,scalar @block);
-            log('DEBUG','Transmit %i bytes',$block_size);
+            msg('DEBUG','Transmit %i bytes',$block_size);
             
             $self->write_raw(@block);
         }
@@ -162,7 +162,7 @@ package Device::IRToy {
         
         if ($transmit_report =~ m/^t(..)([CF])$/) {
             if ($2 eq 'C') {
-                log('INFO','Successfully transmitted ir code');
+                msg('INFO','Successfully transmitted ir code');
             } elsif ($2 eq 'F') {
                 fatal('Buffer underrun during transmit');
             }
@@ -181,7 +181,7 @@ package Device::IRToy {
             (map { pack( "C", $_ & 0xff ) } @data)
         );
         
-        log('DEBUG','About to write %i bytes',scalar(@data));
+        msg('DEBUG','About to write %i bytes',scalar(@data));
         my $bytes = $self->serial->write( $send );
         
         unless (scalar @data == $bytes) {
@@ -200,20 +200,20 @@ package Device::IRToy {
         my $data = '';
         my $errorcount = 0;
         
-        log('DEBUG','About to read data');
+        msg('DEBUG','About to read data');
         while ( my ( $read_ok, $read_byte ) = $self->serial->read(1) ) {
             if ( $read_ok == 0 ) {
                 if ($data ne '') {
                     last;
                 } elsif ( $loopcount++ > $tries) {
-                    log('DEBUG','Read timeout');
+                    msg('DEBUG','Read timeout');
                     return;
                 }
                 usleep(100);
             } else {
                 if (defined $params{bytes}
                     && ord($read_byte) == 0xff) {
-                    log('DEBUG','Got 0xff - ignoring');
+                    msg('DEBUG','Got 0xff - ignoring');
                     $errorcount++;
                     if ($errorcount >= 6) {
                         fatal('Read error');
@@ -231,7 +231,7 @@ package Device::IRToy {
                 }
             }
         }
-        log('DEBUG','Read %s',$data);
+        msg('DEBUG','Read %s',$data);
         return $data;
     }
     
