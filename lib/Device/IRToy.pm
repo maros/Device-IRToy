@@ -1,5 +1,7 @@
 package Device::IRToy {
     use 5.016;
+    use utf8;
+    
     use Moose;
     use Time::HiRes qw(usleep);
     use Carp qw(croak);
@@ -7,8 +9,9 @@ package Device::IRToy {
     
     use Device::IRToy::Utils;
     
-    our $SLEEP_USECONDS = 5000;
-    our $SCALE = 21.33333;
+    our $SLEEP_USECONDS = 5000;         # µs
+    our $SCALE = 21.3333;               # µs
+    our $MAXSIGNAL = 0xffff * $SCALE;   # µs
     
     has 'port' => (
         is              => 'ro',
@@ -233,13 +236,14 @@ package Device::IRToy {
                 }
             }
         }
-        msg('DEBUG','Read %s',$data);
+        msg('DEBUG','Read %i bytes',length($data));
         return $data;
     }
     
     sub recieve {
         my ($self,%params) = @_;
         
+        $params{maxsignal} ||= $MAXSIGNAL;
         my $data = $self->read_raw(%params);
         return
             unless defined $data;
@@ -247,7 +251,10 @@ package Device::IRToy {
         my @return;
         while (length $data) {
             my ($hb,$lb) = split (//,substr($data,0,2,''));
-            push(@return,ord($hb)*(2**8)+ord($lb));
+            my $length = ord($hb)*(2**8)+ord($lb);
+            $length *= $SCALE;
+            $length = int($length + 0.5);
+            push(@return,$length);
         }
         
         if (defined $params{protocol}) {
@@ -258,7 +265,7 @@ package Device::IRToy {
             msg('DEBUG','Try to decode via %s',$protocol);
             return $protocol->decode(\@return);
         }
-        return \@return;
+        return @return;
     }
     __PACKAGE__->meta->make_immutable();
 }

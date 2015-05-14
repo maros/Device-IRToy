@@ -5,7 +5,7 @@ package Device::IRToy::Utils {
     use Exporter;
     our @ISA = qw(Exporter);
     our @EXPORT = qw(msg fatal);
-    our @EXPORT_OK = qw(check_fuzzy round);
+    our @EXPORT_OK = qw(check_fuzzy);
     
     use Carp qw(croak);
     
@@ -25,9 +25,5 @@ package Device::IRToy::Utils {
         my (@message) = @_;
         my $message = msg('FATAL',@message);
         croak $message;
-    }
-    
-    sub round {
-        return int($_[0] + 0.5);
     }
 }
