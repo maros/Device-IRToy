@@ -15,7 +15,7 @@ package Device::IRToy::Protocol::Panasonic {
         my $min     = min(@$data);
         my $dw      = 0;
         
-        if ( !Device::IRToy::Utils::check_fuzzy(  $data->[0]  , 3500, 1000 ) ) {
+        if ( !Device::IRToy::Utils::check_fuzzy(  $data->[0], 3500, 1000 ) ) {
             msg('WARN',"Probably not Panasonic! First period:%%.4fµs 3500µs(+/-1000) expected");
             return;
         }
@@ -25,16 +25,14 @@ package Device::IRToy::Protocol::Panasonic {
             return;
         }
         
-        msg('INFO','OK');
-        
-        my ($j,$i) = (0,0);
+        my ($j,$i);
         my @result = ();
         
         my $bytes = ( $#{$data} - 2 ) / 16;
-        for (my $i = 0; $i < ( $#{$data} - 2 ) / 16; $i++ ) {
+        for ($i = 0; $i < ( $#{$data} - 2 ) / 16; $i++ ) {
             my $bit = 7;
             $result[$i] = 0;
-            for ( $j = 0; $j < 16; $j+=2 ) {
+            for ( $j = 0; $j < 16; $j += 2 ) {
                 $result[$i] |= 1 << ($bit) 
                     if $data->[3+16*$i+$j] > ( $min * 2 );
                 $bit--;
@@ -43,7 +41,7 @@ package Device::IRToy::Protocol::Panasonic {
         
         my $check = 2+16*($i-1)+$j;
         if ( $check != $#{$data} ) {
-            msg('WARN',"Bit missing: %i != %i",$check,$#{$data});
+            msg('WARN',"Stop bit missing: %i != %i",$check,$#{$data});
         }
         
         return \@result;
