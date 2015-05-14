@@ -3,7 +3,7 @@ package Device::IRToy {
     use utf8;
     
     use Moose;
-    use Time::HiRes qw(usleep);
+    use Time::HiRes qw(usleep time);
     use Carp qw(croak);
     use List::Util qw(min);
     
@@ -91,7 +91,10 @@ package Device::IRToy {
         $self->write_raw( ord('s') );
         usleep($SLEEP_USECONDS);
         
-        my $res = $self->read_raw(bytes => 3, timeout => 2000);
+        my $res = $self->read_raw(
+            bytes   => 3, 
+            timeout => 2_000_000
+        );
         if ( defined $res 
             && $res =~ /S(\d\d)$/ ) {
             msg('DEBUG','Initialized sampling mode: API version %s',$res);
@@ -109,6 +112,7 @@ package Device::IRToy {
         usleep($SLEEP_USECONDS);
         $self->write_raw( ord('v') );
         usleep($SLEEP_USECONDS);
+        
         my $version = $self->read_raw(bytes => 4);
         
         if (defined $version 
@@ -122,6 +126,28 @@ package Device::IRToy {
     }
     
     sub transmit {
+        my ($self,%params) = @_;
+        
+        if (defined $params{protocol}) {
+            my $protocol = $params{protocol};
+            $protocol = 'Device::IRToy::Protocol::'.$protocol
+                unless $protocol =~ /::/;
+            Class::Load::load_class($protocol);
+            msg('DEBUG','Try to encode via %s',$protocol);
+            $params{data} = $protocol->encode($params{data});
+        }
+        
+        my @data;
+        foreach my $length (@{$params{data}}) {
+            $length /= $SCALE;
+            my $length_hex = sprintf("%04x",int($length));
+            push(@data,hex(substr($length_hex,0,2)),hex(substr($length_hex,2,2)));
+        }
+        
+        $self->transmit_raw(@data);
+    }
+    
+    sub transmit_raw {
         my ($self,@data) = @_;
         
         if (scalar @data < 2
@@ -198,24 +224,34 @@ package Device::IRToy {
     sub read_raw {
         my ($self,%params) = @_;
         
-        $params{timeout} //= 500;      # in miliseconds
-        my $tries = int($params{timeout} / $self->serial->read_const_time);
+        $params{timeout} //= 500_000; # µs
         
-        my $loopcount = 0;
-        my $data = '';
-        my $errorcount = 0;
+        my $serial      = $self->serial;
+        my $read_time   = ($serial->read_const_time + $serial->read_char_time) * 1000 + 200;
+        my $tries       = int($params{timeout} / $read_time );
+        my $loopcount   = 0;
+        my $data        = '';
+        my $errorcount  = 0;
+        my $maxsignal   = defined $params{maxsignal} ? int($params{maxsignal} / $read_time) : 0;
         
         msg('DEBUG','About to read data');
-        while ( my ( $read_ok, $read_byte ) = $self->serial->read(1) ) {
+        while ( my ( $read_ok, $read_byte ) = $serial->read(1) ) {
             if ( $read_ok == 0 ) {
                 if ($data ne '') {
-                    last;
+                    if ($maxsignal > 0
+                        && $loopcount < $maxsignal) {
+                        #warn "WAIT FOR SIGNAL $loopcount";
+                        $loopcount++;
+                    } else {
+                        last;
+                    }
                 } elsif ( $loopcount++ > $tries) {
                     msg('DEBUG','Read timeout');
                     return;
                 }
                 usleep(100);
             } else {
+                $loopcount = 0;
                 if (defined $params{bytes}
                     && ord($read_byte) == 0xff) {
                     msg('DEBUG','Got 0xff - ignoring');
@@ -244,6 +280,7 @@ package Device::IRToy {
         my ($self,%params) = @_;
         
         $params{maxsignal} ||= $MAXSIGNAL;
+        
         my $data = $self->read_raw(%params);
         return
             unless defined $data;
@@ -265,7 +302,8 @@ package Device::IRToy {
             msg('DEBUG','Try to decode via %s',$protocol);
             return $protocol->decode(\@return);
         }
-        return @return;
+        
+        return \@return;
     }
     __PACKAGE__->meta->make_immutable();
 }
