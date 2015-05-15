@@ -73,7 +73,6 @@ package Device::IRToy {
         return $serial;
     }
     
-    
     # sends commands to reset USBIRToy
     sub reset {
         my ($self) = @_;
@@ -145,6 +144,8 @@ package Device::IRToy {
         }
         
         $self->transmit_raw(@data);
+        
+        return;
     }
     
     sub transmit_raw {
@@ -177,6 +178,7 @@ package Device::IRToy {
             my $buffer_size = $self->read_raw(bytes => 1);
             $buffer_size = ord($buffer_size);
             
+            # Get block for buffer
             my @block = splice @data,0,$buffer_size;
             
             my $block_size = min($buffer_size,scalar @block);
@@ -202,6 +204,7 @@ package Device::IRToy {
         }
         
         $self->sampling_mode();
+        return;
     }
     
     sub write_raw {

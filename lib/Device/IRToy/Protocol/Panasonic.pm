@@ -17,7 +17,7 @@ package Device::IRToy::Protocol::Panasonic {
         my @encoded = @INIT;
         foreach my $byte (@{$data}) {
             for (reverse(0..7)) {
-                if ($byte & 2**$_) {
+                if ($byte & 2 ** $_) {
                     push(@encoded,360,1500);
                 } else {
                     push(@encoded,360,550);
