@@ -12,12 +12,48 @@ package Device::IRToy {
     our $SLEEP_USECONDS = 5000;         # µs
     our $SCALE = 21.3333;               # µs
     our $MAXSIGNAL = 0xffff * $SCALE;   # µs
+
+=encoding utf8
+
+=head1 NAME
+
+Device::IRToy - Interface to USB Infrared Toy Logic Analyzer from dangerousprototypes.com
+
+=head1 SYNOPSIS
+
+ my $ir = Device::IRToy->new( port => '/dev/tty.usbmodem00000001' );
+ $ir->sampling_mode();
+ my $res = $ir->recieve( timeout => 60_000_000, protocol => 'Panasonic', maxsignal => 50_000 );
+
+=head1 DESCRIPTION
+
+TODO
+
+=head1 METHODS
+
+=head2 new
+
+ my $ir = Device::IRToy->new( port => '/dev/tty.00001' );
+
+Creates an Device::IRToy object. Accepts port and baudrate attributes 
+
+=head2 port
+
+Get the serial port device
+
+=cut
     
     has 'port' => (
         is              => 'ro',
         isa             => 'Str',
         required        => 1,
     );
+    
+=head2 baudrate
+
+Get the serial port baudrate
+
+=cut
     
     has 'baudrate' => (
         is              => 'ro',
@@ -26,19 +62,19 @@ package Device::IRToy {
         default         => '115200',
     );
     
-    has 'serial' => (
+    has '_serial' => (
         is              => 'ro',
         isa             => 'Ref',
         lazy            => 1,
         builder         => '_build_serial',
-        predicate       => 'has_serial',
+        predicate       => '_has_serial',
     );
     
     sub DEMOLISH {
         my ($self) = @_;
-        if ($self->has_serial) {
+        if ($self->_has_serial) {
             msg('INFO','Closing serial port');
-            $self->serial->close();
+            $self->_serial->close();
         }
     }
     
@@ -73,12 +109,23 @@ package Device::IRToy {
         return $serial;
     }
     
-    # sends commands to reset USBIRToy
+=head2 reset
+
+Sends a reset command (5 x 0x00) to IRToy
+
+=cut
+    
     sub reset {
         my ($self) = @_;
         msg('INFO','Run reset');
         $self->write_raw((0x00) x 5);
     }
+    
+=head2 sampling_mode
+
+Enables sampling mode on the IRToy
+
+=cut
     
     # enable sampling mode
     sub sampling_mode {
@@ -104,6 +151,14 @@ package Device::IRToy {
         return 0;
     }
     
+=head2 version
+
+ my ($hw_version,$sw_version) = $ir->version;
+
+Returns the hardware revision, and the firmware version
+
+=cut
+    
     sub version {
         my ($self) = @_;
         
@@ -124,29 +179,60 @@ package Device::IRToy {
         }
     }
     
-    sub transmit {
-        my ($self,%params) = @_;
+=head2 transmit_protocol
+
+ $ir->transmit_protocol(
+    'Panasonic',
+    232,21,9,11,76, # Bytes to transmit
+ );
+
+Transmits the given data via IRToys, using a given protocol for encoding.
+
+=cut
+    
+    sub transmit_protocol {
+        my ($self,$protocol,@data) = @_;
         
-        if (defined $params{protocol}) {
-            my $protocol = $params{protocol};
-            $protocol = 'Device::IRToy::Protocol::'.$protocol
-                unless $protocol =~ /::/;
-            Class::Load::load_class($protocol);
-            msg('DEBUG','Try to encode via %s',$protocol);
-            $params{data} = $protocol->encode($params{data});
-        }
+        $protocol = 'Device::IRToy::Protocol::'.$protocol
+            unless $protocol =~ /::/;
+        Class::Load::load_class($protocol);
+        msg('DEBUG','Try to encode via %s',$protocol);
+        my $timing_data = $protocol->encode(\@data);
+        return $self->transmit_timing(@{$timing_data});
         
-        my @data;
-        foreach my $length (@{$params{data}}) {
+    }
+    
+=head2 transmit_timing
+
+ $ir->transmit_timing(
+    2322,600,300,500,300,1500
+ );
+
+Transmits a signal with the given timing information (in µs)
+
+=cut
+    
+    sub transmit_timing {
+        my ($self,@data) = @_;
+        
+        foreach my $length (@data) {
             $length /= $SCALE;
             my $length_hex = sprintf("%04x",int($length));
             push(@data,hex(substr($length_hex,0,2)),hex(substr($length_hex,2,2)));
         }
         
-        $self->transmit_raw(@data);
-        
-        return;
+        return $self->transmit_raw(@data);
     }
+    
+=head2 transmit_raw
+
+ $ir->transmit_raw(
+    0x32, 0x11, 0x00, 0xfa 
+ );
+
+Transmits raw data via IRToy.
+
+=cut
     
     sub transmit_raw {
         my ($self,@data) = @_;
@@ -207,6 +293,14 @@ package Device::IRToy {
         return;
     }
     
+=head2 write_raw
+
+ $ir->write_raw( 0x23, 0x45 );
+
+Sends the supplied bytes to IR toy
+
+=cut
+
     sub write_raw {
         my ($self,@data) = @_;
         
@@ -216,7 +310,7 @@ package Device::IRToy {
         );
         
         msg('DEBUG','About to write %i bytes',scalar(@data));
-        my $bytes = $self->serial->write( $send );
+        my $bytes = $self->_serial->write( $send );
         
         unless (scalar @data == $bytes) {
             fatal('Incorrect number of bytes written. Expected %i, got',scalar @data,$bytes);
@@ -224,12 +318,31 @@ package Device::IRToy {
         return $bytes;
     }
     
+=head2 read_raw
+
+ my $data = $ir->read_raw( timeout => 500_000, bytes => 4 );
+
+Tries to read raw data from IRToy, and returns data as arrayref. Accepts the 
+following parameters
+
+=over
+
+=item * timeout: Read timeout
+
+=item * maxsignal: Maximum possible length of single signal when recieving data
+
+=item * bytes: Expected number of bytes
+
+=back
+
+=cut
+    
     sub read_raw {
         my ($self,%params) = @_;
         
         $params{timeout} //= 500_000; # µs
         
-        my $serial      = $self->serial;
+        my $serial      = $self->_serial;
         my $read_time   = ($serial->read_const_time + $serial->read_char_time) * 1000 + 200;
         my $tries       = int($params{timeout} / $read_time );
         my $loopcount   = 0;
@@ -278,6 +391,16 @@ package Device::IRToy {
         msg('DEBUG','Read %i bytes',length($data));
         return $data;
     }
+    
+=head2 recieve
+
+ my $data = $ir->recieve( timeout => 500_000, protocol => 'Panasonic' );
+
+Tries to recieve data from IRToy, and returns data as arrayref. Accepts the 
+same parameters as L<read_raw> plus C<protocol>. If no protocol has been 
+specified, data will be timing information in µs, otherwise bytes.
+
+=cut
     
     sub recieve {
         my ($self,%params) = @_;

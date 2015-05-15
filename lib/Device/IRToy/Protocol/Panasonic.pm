@@ -25,7 +25,6 @@ package Device::IRToy::Protocol::Panasonic {
             }
         }
         
-        
         return \@encoded;
     }
     
