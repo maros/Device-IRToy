@@ -5,6 +5,8 @@ package Device::IRToy::Protocol::Panasonic {
     use Device::IRToy::Utils;
     use List::Util qw(min);
     
+    my @INIT = (3700,1900);
+    
     sub encode {
         my ( $class,$data ) = @_;
         
@@ -12,7 +14,7 @@ package Device::IRToy::Protocol::Panasonic {
             unless defined $data
             && ref $data eq 'ARRAY';
         
-        my @encoded = (3700,1900);
+        my @encoded = @INIT;
         foreach my $byte (@{$data}) {
             for (reverse(0..7)) {
                 if ($byte & 2**$_) {
@@ -37,14 +39,11 @@ package Device::IRToy::Protocol::Panasonic {
         my $min     = min(@$data);
         my $dw      = 0;
         
-        if ( !Device::IRToy::Utils::check_fuzzy(  $data->[0], 3500, 1000 ) ) {
-            msg('WARN',"Probably not Panasonic! First period:%%.4fµs 3500µs(+/-1000) expected");
-            return;
-        }
-        
-        if ( !Device::IRToy::Utils::check_fuzzy( $data->[1], 1500, 500 ) ) {
-            msg('WARN',"Probably not Panasonic! Second period:%%.4fµs 1500µs(+/-500) expected");
-            return;
+        for my $index (0..$#INIT) {
+            if ( !Device::IRToy::Utils::check_fuzzy(  $data->[$index], $INIT[$index], 1000 ) ) {
+                msg('WARN',"Probably not Panasonic! period %i:%%.4fµs %iµs(+/-1000) expected",$index,$INIT[$index]);
+                return;
+            }
         }
         
         my ($j,$i);
