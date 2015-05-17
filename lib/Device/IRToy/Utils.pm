@@ -5,13 +5,17 @@ package Device::IRToy::Utils {
     use Exporter;
     our @ISA = qw(Exporter);
     our @EXPORT = qw(msg fatal);
-    our @EXPORT_OK = qw(check_fuzzy);
+    our @EXPORT_OK = qw(check_fuzzy bit2int);
     
     use Carp qw(croak);
     
     sub check_fuzzy {
         my ( $v, $c, $fuzz ) = @_;
         return ( $v < ( $c + $fuzz ) && $v > ( $c - $fuzz ) );
+    }
+    
+    sub bit2int {
+        return unpack("N",pack("B32",sprintf("%032s",shift)));
     }
     
     sub msg {
