@@ -9,7 +9,7 @@ package Device::IRToy::Protocol::Denon {
     our $DATA = 10; 
     
     sub maxsignal {
-        return 48_000;
+        return 50_000;
     }
     
     sub encode {
@@ -37,7 +37,7 @@ package Device::IRToy::Protocol::Denon {
             push(@timing, map { $_ ? (260,1850) : (260,780) } @record);
             push(@timing,260,45000);
             push(@timing, map { $_ ? (260,1850) : (260,780) } @inverse);
-            push(@timing,260,1_398_000);
+            #push(@timing,260,1_398_000);
         }
         
         return \@timing;
@@ -45,12 +45,6 @@ package Device::IRToy::Protocol::Denon {
     
     sub decode {
         my ( $class,$data ) = @_;
-        
-        use Data::Dumper;
-        {
-          local $Data::Dumper::Maxdepth = 2;
-          warn __FILE__.':line'.__LINE__.':'.Dumper($data);
-        }
         
         return
             unless defined $data
