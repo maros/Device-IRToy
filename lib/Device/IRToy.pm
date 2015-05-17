@@ -405,12 +405,30 @@ specified, data will be timing information in µs, otherwise bytes.
     sub recieve {
         my ($self,%params) = @_;
         
-        $params{maxsignal} ||= $MAXSIGNAL;
+        my $protocol;
+        if (defined $params{protocol}) {
+            $protocol = $params{protocol};
+            $protocol = 'Device::IRToy::Protocol::'.$protocol
+                unless $protocol =~ /::/;
+            Class::Load::load_class($protocol);
+        }
         
+        # Get max signal length
+        unless (defined $params{maxsignal}) {
+            if (defined $protocol) {
+                $params{maxsignal} = $protocol->maxsignal;
+            } else {
+                $params{maxsignal} = $MAXSIGNAL;
+            }
+        }
+        
+        # Read
         my $data = $self->read_raw(%params);
         return
-            unless defined $data;
+            if ! defined $data
+            || $data eq '';
         
+        # Decode timing
         my @return;
         while (length $data) {
             my ($hb,$lb) = split (//,substr($data,0,2,''));
@@ -420,11 +438,8 @@ specified, data will be timing information in µs, otherwise bytes.
             push(@return,$length);
         }
         
-        if (defined $params{protocol}) {
-            my $protocol = $params{protocol};
-            $protocol = 'Device::IRToy::Protocol::'.$protocol
-                unless $protocol =~ /::/;
-            Class::Load::load_class($protocol);
+        # Decode protocol
+        if (defined $protocol) {
             msg('DEBUG','Try to decode via %s',$protocol);
             return $protocol->decode(\@return);
         }

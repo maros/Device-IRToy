@@ -7,6 +7,10 @@ package Device::IRToy::Protocol::Panasonic {
     
     my @INIT = (3700,1900);
     
+    sub maxsignal {
+        return 4500;
+    }
+    
     sub encode {
         my ( $class,$data ) = @_;
         

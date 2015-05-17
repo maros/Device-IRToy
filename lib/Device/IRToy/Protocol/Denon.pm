@@ -219,6 +219,9 @@ package Device::IRToy::Protocol::Denon {
 #          213,
 #          1899,
 #          192,
+    sub maxsignal {
+        return 48_000;
+    }
     
     sub decode {
         my ( $class,$data ) = @_;
