@@ -197,9 +197,8 @@ Transmits the given data via IRToys, using a given protocol for encoding.
             unless $protocol =~ /::/;
         Class::Load::load_class($protocol);
         msg('DEBUG','Try to encode via %s',$protocol);
-        my $timing_data = $protocol->encode(\@data);
+        my $timing_data = $protocol->encode(@data);
         return $self->transmit_timing(@{$timing_data});
-        
     }
     
 =head2 transmit_timing
@@ -215,13 +214,14 @@ Transmits a signal with the given timing information (in µs)
     sub transmit_timing {
         my ($self,@data) = @_;
         
+        my @raw;
         foreach my $length (@data) {
             $length /= $SCALE;
             my $length_hex = sprintf("%04x",int($length));
-            push(@data,hex(substr($length_hex,0,2)),hex(substr($length_hex,2,2)));
+            push(@raw,hex(substr($length_hex,0,2)),hex(substr($length_hex,2,2)));
         }
         
-        return $self->transmit_raw(@data);
+        return $self->transmit_raw(@raw);
     }
     
 =head2 transmit_raw
@@ -261,7 +261,11 @@ Transmits raw data via IRToy.
         
         while (scalar @data) {
             # Read handshake
-            my $buffer_size = $self->read_raw(bytes => 1);
+            my $buffer_size;
+            
+            while (! defined $buffer_size) {
+                $buffer_size = $self->read_raw(bytes => 1);
+            }
             $buffer_size = ord($buffer_size);
             
             # Get block for buffer
