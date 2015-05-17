@@ -388,6 +388,9 @@ following parameters
                 }
             }
         }
+        return
+            unless length($data);
+        
         msg('DEBUG','Read %i bytes',length($data));
         return $data;
     }

@@ -6,13 +6,51 @@ package Device::IRToy::Protocol::Denon {
     
     our $PREFIX = '00';
     our $MODULE = 3;
+    our $DATA = 10; 
     
     sub maxsignal {
         return 48_000;
     }
     
+    sub encode {
+        my ( $class,$data ) = @_;
+        
+        return
+            unless defined $data
+            && ref $data eq 'HASH';
+        
+        $data->{count} ||= 1;
+        $data->{length} ||= length(sprintf('%b',$data->{value}));
+        
+        my @record = split //,$PREFIX;
+        push(@record,split //,sprintf('%0'.$MODULE.'b',$data->{module}));
+        my @inverse = @record;
+        my $value   = sprintf('%0'.$data->{length}.'b',$data->{value});
+        push(@record,split //,$value);
+        $value =~ tr/01/10/;
+        push(@inverse,split //,$value);
+        
+        my @timing;
+        foreach my $index (0..$data->{count}) {
+            push(@timing,260,42000)
+                if (scalar(@timing));
+            push(@timing, map { $_ ? (260,1850) : (260,780) } @record);
+            push(@timing,260,45000);
+            push(@timing, map { $_ ? (260,1850) : (260,780) } @inverse);
+            push(@timing,260,1_398_000);
+        }
+        
+        return \@timing;
+    }
+    
     sub decode {
         my ( $class,$data ) = @_;
+        
+        use Data::Dumper;
+        {
+          local $Data::Dumper::Maxdepth = 2;
+          warn __FILE__.':line'.__LINE__.':'.Dumper($data);
+        }
         
         return
             unless defined $data
@@ -68,7 +106,12 @@ package Device::IRToy::Protocol::Denon {
         $module = Device::IRToy::Utils::bit2int($module);
         my $return = Device::IRToy::Utils::bit2int($result);
         
-        return { module => $module, value => $return, count => int($count/2) };
+        return { 
+            module => $module, 
+            value => $return,
+            length => length($result),
+            count => int($count/2) 
+        };
     }
 }
 
