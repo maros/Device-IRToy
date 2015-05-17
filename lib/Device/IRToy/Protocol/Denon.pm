@@ -4,221 +4,9 @@ package Device::IRToy::Protocol::Denon {
     
     use Device::IRToy::Utils;
     
-#    #          1,
-#          1,
-#          0,
-#          0,
-#          0,
-#          1,
-#          1,
-#          1,
-#          0,
-#          0,
-#          1,
-#          1,
-#          1,
-#          0,
-#          0,
-#          1,
-#          1,
-#          0,
-#          1,
-#          1,
-#          0,
-#          0,
-#          0, 
-#    
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          1877,
-#          213,
-#          1856,
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          1877,
-#          213,
-#          811,
-#          213,
-#          1856,
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          47189,
-#          256,
-#          768,
-#          256,
-#          768,
-#          256,
-#          1813,
-#          256,
-#          1813,
-#          256,
-#          768,
-#          256,
-#          1835,
-#          256,
-#          1835,
-#          213,
-#          1877,
-#          256,
-#          1813,
-#          277,
-#          768,
-#          256,
-#          1813,
-#          277,
-#          768,
-#          256,
-#          1813,
-#          256,
-#          1835,
-#          256,
-#          1856,
-#          256,
-#          40725,
-#          256,
-#          768,
-#          256,
-#          789,
-#          256,
-#          1813,
-#          277,
-#          1835,
-#          256,
-#          768,
-#          256,
-#          789,
-#          256,
-#          789,
-#          256,
-#          768,
-#          256,
-#          789,
-#          256,
-#          1835,
-#          256,
-#          768,
-#          256,
-#          1835,
-#          256,
-#          747,
-#          277,
-#          747,
-#          277,
-#          747,
-#          277,
-#          47147,
-#          256,
-#          768,
-#          235,
-#          789,
-#          235,
-#          1856,
-#          256,
-#          1835,
-#          277,
-#          768,
-#          277,
-#          1813,
-#          277,
-#          1813,
-#          277,
-#          1813,
-#          277,
-#          1813,
-#          277,
-#          768,
-#          277,
-#          1813,
-#          277,
-#          768,
-#          277,
-#          1792,
-#          277,
-#          1835,
-#          277,
-#          1813,
-#          277,
-#          40704,
-#          277,
-#          768,
-#          277,
-#          789,
-#          256,
-#          1813,
-#          277,
-#          1813,
-#          277,
-#          768,
-#          277,
-#          768,
-#          256,
-#          768,
-#          277,
-#          768,
-#          256,
-#          768,
-#          256,
-#          1813,
-#          256,
-#          768,
-#          256,
-#          1813,
-#          256,
-#          768,
-#          235,
-#          789,
-#          235,
-#          811,
-#          213,
-#          47168,
-#          213,
-#          811,
-#          213,
-#          811,
-#          213,
-#          1877,
-#          213,
-#          1877,
-#          213,
-#          811,
-#          213,
-#          1877,
-#          213,
-#          1877,
-#          213,
-#          1877,
-#          213,
-#          1877,
-#          213,
-#          811,
-#          213,
-#          1877,
-#          213,
-#          811,
-#          213,
-#          1877,
-#          192,
-#          1899,
-#          213,
-#          1899,
-#          192,
+    our $PREFIX = '00';
+    our $MODULE = 3;
+    
     sub maxsignal {
         return 48_000;
     }
@@ -226,36 +14,61 @@ package Device::IRToy::Protocol::Denon {
     sub decode {
         my ( $class,$data ) = @_;
         
-        use Data::Dumper;
-        {
-          local $Data::Dumper::Maxdepth = 2;
-          warn __FILE__.':line'.__LINE__.':'.Dumper($data);
-        }
-        
         return
             unless defined $data
             && ref $data eq 'ARRAY';
         
-        my @result;
+        my $count   = 0;
+        my ($result,$block) = ('','');
         for (my $i = 0; $i <= $#{$data}; $i++) {
+            if ($data->[$i] > 1_250_000) {
+                if ($block eq '') {
+                    return;
+                }
+                next;
+            }
             if ($i % 2 == 0) {
                 if (!Device::IRToy::Utils::check_fuzzy($data->[$i],250,100)) {
-                    msg('WARN',"Probably not Denon1! Low period:250µs(+/-100) expected,");
+                    msg('WARN',"Probably not Denon1! Low period 250µs(+/-100) expected: Got %i",$data->[$i]);
                     return;
                 }
             } else {
                 if (Device::IRToy::Utils::check_fuzzy($data->[$i],1850,100)) {
-                    push(@result,1);
+                    $block .= '1';
                 } elsif (Device::IRToy::Utils::check_fuzzy($data->[$i],780,100)) {
-                    push(@result,0);
-                } elsif (Device::IRToy::Utils::check_fuzzy($data->[$i],47,100)) {
+                    $block .= '0';
+                } elsif (Device::IRToy::Utils::check_fuzzy($data->[$i],44000,5000)) {
+                    if ($count == 0) {
+                        $result = $block;
+                    } else {
+                        my $block_data = substr($block,length($PREFIX)+$MODULE);
+                        my $result_data = substr($result,length($PREFIX)+$MODULE);
+                        if ($count % 2 != 0) {
+                            $block_data =~ tr/01/10/;
+                        }
+                        if ($block_data ne $result_data) {
+                            msg('WARN',"Repeated block does not match first block: %s vs %s",$block_data,$result_data);
+                        }
+                    }
+                    $count++;
+                    $block = '';
                 } else {
-                    msg('WARN',"Probably not Denon1! High period:1850µs or 780µs(+/-100) expected: %i",$data->[$i]);
+                    msg('WARN',"Probably not Denon1! High period 1850µs or 780µs(+/-100) expected: Got %i",$data->[$i]);
                 }
             }
         }
         
-        return \@result;
+        my $prefix = substr($result,0,length($PREFIX),'');
+        my $module = substr($result,0,$MODULE,'');
+        
+        if ($prefix ne $PREFIX) {
+             msg('WARN',"Prefix does not match %s: Got %s",$PREFIX,$prefix);
+        }
+        
+        $module = Device::IRToy::Utils::bit2int($module);
+        my $return = Device::IRToy::Utils::bit2int($result);
+        
+        return { module => $module, value => $return, count => int($count/2) };
     }
 }
 
