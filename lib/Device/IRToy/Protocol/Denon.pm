@@ -20,15 +20,15 @@ package Device::IRToy::Protocol::Denon {
             && ref $data eq 'HASH';
         
         $data->{count} ||= 1;
-        $data->{length} ||= length(sprintf('%b',$data->{value}));
+        $data->{length} ||= length(sprintf('%b',$data->{code}));
         
         my @record = split //,$PREFIX;
         push(@record,split //,sprintf('%0'.$MODULE.'b',$data->{module}));
         my @inverse = @record;
-        my $value   = sprintf('%0'.$data->{length}.'b',$data->{value});
-        push(@record,split //,$value);
-        $value =~ tr/01/10/;
-        push(@inverse,split //,$value);
+        my $code   = sprintf('%0'.$data->{length}.'b',$data->{code});
+        push(@record,split //,$code);
+        $code =~ tr/01/10/;
+        push(@inverse,split //,$code);
         
         my @timing;
         foreach my $index (0..$data->{count}) {
@@ -37,7 +37,8 @@ package Device::IRToy::Protocol::Denon {
             push(@timing, map { $_ ? (260,1850) : (260,780) } @record);
             push(@timing,260,45000);
             push(@timing, map { $_ ? (260,1850) : (260,780) } @inverse);
-            #push(@timing,260,1_398_000);
+            push(@timing,260,1_398_000)
+                if $index < $data->{count};
         }
         
         return \@timing;
@@ -101,10 +102,10 @@ package Device::IRToy::Protocol::Denon {
         my $return = Device::IRToy::Utils::bit2int($result);
         
         return { 
-            module => $module, 
-            value => $return,
-            length => length($result),
-            count => int($count/2) 
+            module  => $module, 
+            code    => $return,
+            length  => length($result),
+            count   => int($count/2) 
         };
     }
 }
