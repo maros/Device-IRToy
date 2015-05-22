@@ -29,7 +29,7 @@ sub _transmit {
     
     state $ir;
     unless (defined $ir) {
-        $ir = Device::IRToy->new( port => '/dev/tty.usbmodem00000001' );
+        $ir = Device::IRToy->new( port => '/dev/ttyACM1' );
         $ir->sampling_mode();
     }
     $ir->transmit_protocol(
@@ -65,6 +65,10 @@ sub action_vol_down {
 
 sub action_cd_play {
     _transmit(command => 'cd_play');
+}
+
+sub action_wait {
+    sleep(1);
 }
 
 foreach my $command (@ARGV) {
