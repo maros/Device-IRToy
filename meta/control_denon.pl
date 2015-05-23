@@ -17,6 +17,9 @@ my %COMMANDS = (
     cd_play     => { code => 232,  module => 2 },
 );
 
+my $ir = Device::IRToy->new( port => '/dev/ttyACM1' );
+$ir->sampling_mode();
+
 sub _transmit {
     my (%params) = @_;
     if (my $command = delete $params{command}) {
@@ -26,12 +29,6 @@ sub _transmit {
     }
     $params{count} //= 1;
     $params{length} //= 10;
-    
-    state $ir;
-    unless (defined $ir) {
-        $ir = Device::IRToy->new( port => '/dev/ttyACM1' );
-        $ir->sampling_mode();
-    }
     $ir->transmit_protocol(
         'Denon',
         \%params,
@@ -80,3 +77,4 @@ foreach my $command (@ARGV) {
     }
 }
 
+$ir->close;

@@ -68,13 +68,19 @@ Get the serial port baudrate
         lazy            => 1,
         builder         => '_build_serial',
         predicate       => '_has_serial',
+        clearer         => '_clear_serial',
     );
     
     sub DEMOLISH {
+        $self->close;
+    }
+    
+    sub close {
         my ($self) = @_;
         if ($self->_has_serial) {
             msg('INFO','Closing serial port');
             $self->_serial->close();
+            $self->_clear_serial();
         }
     }
     
