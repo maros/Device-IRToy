@@ -90,11 +90,11 @@ Get the serial port baudrate
         my $serial;
         if ($^O eq 'MSWin32') {
             require Win32::SerialPort;
-            $serial = new Win32::SerialPort($self->port)
+            $serial = Win32::SerialPort->new($self->port)
                 or fatal("Can't open serial port! Win32::SerialPort(".$self->port.")");
         } else {
             require Device::SerialPort;
-            $serial = new Device::SerialPort($self->port)
+            $serial = Device::SerialPort->new($self->port)
                 or fatal("Can't open serial port! Device::SerialPort(".$self->port.")");
         }
         
