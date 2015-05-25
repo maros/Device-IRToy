@@ -17,7 +17,7 @@ my %COMMANDS = (
     cd_play     => { code => 232,  module => 2 },
 );
 
-my $ir = Device::IRToy->new( port => '/dev/ttyACM1' );
+my $ir = Device::IRToy->new( port => '/dev/ttyACM0' );
 $ir->sampling_mode();
 
 sub _transmit {
