@@ -72,6 +72,7 @@ Get the serial port baudrate
     );
     
     sub DEMOLISH {
+        my ($self) = @_;
         $self->close;
     }
     
