@@ -17,7 +17,7 @@ my %COMMANDS = (
     cd_play     => { code => 232,  module => 2 },
 );
 
-my $ir = Device::IRToy->new( port => '/dev/ttyACM0' );
+my $ir = Device::IRToy->new( port => '/dev/tty.usbmodem00000001' );
 $ir->sampling_mode();
 
 sub _transmit {
@@ -36,7 +36,7 @@ sub _transmit {
 }
 
 sub action_off {
-    _transmit(command => '10');
+    _transmit(command => '1');
     _transmit(command => 'power');
 }
 
@@ -47,7 +47,7 @@ sub action_on {
 }
 
 sub action_aux {
-    _transmit(command => '10');
+    _transmit(command => '1');
     _transmit(command => 'toggle');
     _transmit(command => 'toggle');
 }
