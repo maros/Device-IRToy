@@ -23,7 +23,11 @@ Device::IRToy - Interface to USB Infrared Toy Logic Analyzer from dangerousproto
 
  my $ir = Device::IRToy->new( port => '/dev/tty.usbmodem00000001' );
  $ir->sampling_mode();
- my $res = $ir->recieve( timeout => 60_000_000, protocol => 'Panasonic', maxsignal => 50_000 );
+ my $res = $ir->recieve( 
+    timeout     => 60_000_000, 
+    protocol    => 'Panasonic', 
+    maxsignal   => 50_000 
+ );
 
 =head1 DESCRIPTION
 
@@ -76,6 +80,12 @@ Get the serial port baudrate
         $self->close;
     }
     
+=head2 close
+
+Closes the serial port.
+
+=cut
+
     sub close {
         my ($self) = @_;
         if ($self->_has_serial) {
@@ -134,7 +144,6 @@ Enables sampling mode on the IRToy
 
 =cut
     
-    # enable sampling mode
     sub sampling_mode {
         my ($self) = @_;
         
@@ -460,5 +469,33 @@ specified, data will be timing information in µs, otherwise bytes.
         
         return \@return;
     }
+    
+=head1 IR PROTOCOLS
+
+Device::IRToy supports pluggable IR protocols for de- and encoding messages.
+Protocol implementations must reside in the Device::IRToy::Protocol::*
+namespace and implement three methods:
+
+=over
+
+=item * decode
+
+Recieves an arraref of timing information (in µs), and returns arbitrary data
+that represents the decoded message.
+
+=item * encode
+
+Encodes the message representation specified by the decoder class and returns
+an arrayref of timing information.
+
+=item * maxsignal
+
+In order to filter out signal noise, the decoder should specify the max length
+of a single signal (a single bit or the break between transmitting a bit)
+
+=back
+
+=cut
+    
     __PACKAGE__->meta->make_immutable();
 }
