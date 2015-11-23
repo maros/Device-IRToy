@@ -2,6 +2,9 @@ package Device::IRToy::Protocol::Denon {
     use 5.016;
     use warnings;
     
+    use Moose;
+    with qw(Device::IRToy::InterfaceProtocol);
+    
     use Device::IRToy::Utils;
     
     our $PREFIX = '00';
