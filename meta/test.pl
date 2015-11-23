@@ -9,6 +9,9 @@ use Device::IRToy;
 
 my $ir = Device::IRToy->new( port => '/dev/tty.usbmodem00000001' );
 local $SIG{INT} = sub { die('Interupt') };
+
+$ir->reset();
+$ir->reset();
 version();
 $ir->sampling_mode();
 
@@ -18,6 +21,14 @@ read_ir();
 sub read_ir {
     my @res = $ir->read( timeout => 60_000 );
     say join " ",@res;
+while(1) {
+    my $res = $ir->recieve( timeout => 60_000_000, ,maxsignal => 25000);
+    
+    use Data::Dumper;
+    {
+      local $Data::Dumper::Maxdepth = 2;
+      warn __FILE__.':line'.__LINE__.':'.Dumper($res);
+    };
 }
 
 
@@ -29,9 +40,9 @@ sub version {
 sub blink {
     for (1..3) {
         say('run');
-        $ir->transmit(0x12);
+        $ir->write_raw(0x12);
         sleep(1);
-        $ir->transmit(0x13);
+        $ir->write_raw(0x13);
         sleep(1);
     }
 }
