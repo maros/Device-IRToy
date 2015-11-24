@@ -23,7 +23,7 @@ Device::IRToy - Interface to USB Infrared Toy Logic Analyzer from dangerousproto
 
  my $ir = Device::IRToy->new( port => '/dev/tty.usbmodem00000001' );
  $ir->sampling_mode();
- my $res = $ir->recieve( 
+ my $res = $ir->receive( 
     timeout     => 60_000_000, 
     protocol    => 'Panasonic', 
     maxsignal   => 50_000 
@@ -415,17 +415,17 @@ following parameters
         return $data;
     }
     
-=head2 recieve
+=head2 receive
 
- my $data = $ir->recieve( timeout => 500_000, protocol => 'Panasonic' );
+ my $data = $ir->receive( timeout => 500_000, protocol => 'Panasonic' );
 
-Tries to recieve data from IRToy, and returns data as arrayref. Accepts the 
+Tries to receive data from IRToy, and returns data as arrayref. Accepts the 
 same parameters as L<read_raw> plus C<protocol>. If no protocol has been 
 specified, data will be timing information in µs, otherwise bytes.
 
 =cut
     
-    sub recieve {
+    sub receive {
         my ($self,%params) = @_;
         
         my $protocol;
@@ -480,7 +480,7 @@ namespace and implement three methods:
 
 =item * decode
 
-Recieves an arraref of timing information (in µs), and returns arbitrary data
+receives an arraref of timing information (in µs), and returns arbitrary data
 that represents the decoded message.
 
 =item * encode
