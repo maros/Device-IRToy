@@ -77,7 +77,8 @@ Get the serial port baudrate
     
     sub DEMOLISH {
         my ($self) = @_;
-        $self->close;
+        $self->close
+            if defined $self;
     }
     
 =head2 close
@@ -88,7 +89,8 @@ Closes the serial port.
 
     sub close {
         my ($self) = @_;
-        if ($self->_has_serial) {
+        if ($self->_has_serial
+            && defined $self->_serial) {
             msg('INFO','Closing serial port');
             $self->_serial->close();
             $self->_clear_serial();
