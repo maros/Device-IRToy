@@ -53,11 +53,11 @@ sub action_aux {
 }
 
 sub action_vol_up {
-    _transmit(command => 'vol_up');
+    _transmit(command => 'vol_up', count => shift);
 }
 
 sub action_vol_down {
-    _transmit(command => 'vol_down');
+    _transmit(command => 'vol_down', count => shift);
 }
 
 sub action_cd_play {
@@ -68,12 +68,17 @@ sub action_wait {
     sleep(1);
 }
 
+my $count = 1;
 foreach my $command (@ARGV) {
     no strict 'refs';
     my $function = 'action_'.$command;
-    if (defined &{$function}) {
+    if ($command =~ /^\d+$/) {
+        $count = $command;
+    } elsif (defined &{$function}) {
         say "Run command $command";
-        &{$function}()
+        &{$function}($count)
+    } else {
+        say "Ignoring $command";
     }
 }
 
