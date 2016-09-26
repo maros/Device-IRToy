@@ -147,8 +147,8 @@ Enables sampling mode on the IRToy
 =cut
 
     sub sampling_mode {
-        my ($self) = @_;
-        
+        my ($self,$retry) = @_;
+
         $self->reset();
 
         msg('INFO','Initializing sampling mode');
@@ -164,6 +164,10 @@ Enables sampling mode on the IRToy
             msg('DEBUG','Initialized sampling mode: API version %s',$res);
             return 1;
         } else {
+            unless ($retry) {
+                return 1
+                    if $self->sampling_mode(1);
+            }
             fatal('Could not initialize sampling mode');
         }
         return 0;
