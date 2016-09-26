@@ -266,6 +266,7 @@ Transmits raw data via IRToy.
         }
 
         # End data
+        unless ($data[-2] eq 0xff
             && $data[-1] eq 0xff) {
             push(@data,0xff,0xff);
         }
@@ -458,15 +459,10 @@ specified, data will be timing information in µs, otherwise bytes.
             || $data eq '';
 
         # Decode timing
-        my @return;
-        while (length $data) {
-            my ($hb,$lb) = split (//,substr($data,0,2,''));
-            my $length = ord($hb)*(2**8)+ord($lb);
-            $length *= $SCALE;
-            $length = int($length + 0.5);
-            push(@return,$length);
-        }
-        
+        my @return = map {
+            int($_ * $SCALE + 0.5);
+        } _decode_data($data);
+
         # Decode protocol
         if (defined $protocol) {
             msg('DEBUG','Try to decode via %s',$protocol);
