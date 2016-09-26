@@ -1,30 +1,30 @@
 package Device::IRToy::Protocol::Denon {
     use 5.016;
     use warnings;
-    
+
     use Moose;
     with qw(Device::IRToy::InterfaceProtocol);
-    
+
     use Device::IRToy::Utils;
-    
+
     our $PREFIX = '00';
     our $MODULE = 3;
-    our $DATA = 10; 
-    
+    our $DATA = 10;
+
     sub maxsignal {
         return 50_000;
     }
-    
+
     sub encode {
         my ( $class,$data ) = @_;
-        
+
         return
             unless defined $data
             && ref $data eq 'HASH';
-        
+
         $data->{count} ||= 1;
         $data->{length} ||= length(sprintf('%b',$data->{code}));
-        
+
         my @record = split //,$PREFIX;
         push(@record,split //,sprintf('%0'.$MODULE.'b',$data->{module}));
         my @inverse = @record;
@@ -32,7 +32,7 @@ package Device::IRToy::Protocol::Denon {
         push(@record,split //,$code);
         $code =~ tr/01/10/;
         push(@inverse,split //,$code);
-        
+
         my @timing;
         foreach my $index (0..$data->{count}) {
             push(@timing,260,42000)
@@ -43,17 +43,17 @@ package Device::IRToy::Protocol::Denon {
             push(@timing,260,1_398_000)
                 if $index < $data->{count};
         }
-        
+
         return \@timing;
     }
-    
+
     sub decode {
         my ( $class,$data ) = @_;
-        
+
         return
             unless defined $data
             && ref $data eq 'ARRAY';
-        
+
         my $count   = 0;
         my ($result,$block) = ('','');
         for (my $i = 0; $i <= $#{$data}; $i++) {
@@ -93,22 +93,22 @@ package Device::IRToy::Protocol::Denon {
                 }
             }
         }
-        
+
         my $prefix = substr($result,0,length($PREFIX),'');
         my $module = substr($result,0,$MODULE,'');
-        
+
         if ($prefix ne $PREFIX) {
              msg('WARN',"Prefix does not match %s: Got %s",$PREFIX,$prefix);
         }
-        
+
         $module = Device::IRToy::Utils::bit2int($module);
         my $return = Device::IRToy::Utils::bit2int($result);
-        
-        return { 
-            module  => $module, 
+
+        return {
+            module  => $module,
             code    => $return,
             length  => length($result),
-            count   => int($count/2) 
+            count   => int($count/2)
         };
     }
 }
