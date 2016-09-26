@@ -12,6 +12,7 @@ package Device::IRToy {
     our $SLEEP_USECONDS = 5000;         # µs
     our $SCALE = 21.3333;               # µs
     our $MAXSIGNAL = 0xffff * $SCALE;   # µs
+    our $PIC_CLOCK = 12;                # µs
 
 =encoding utf8
 
@@ -474,7 +475,47 @@ specified, data will be timing information in µs, otherwise bytes.
 
         return \@return;
     }
-    
+
+
+=head2 frequency_report
+
+ my $report = $ir->frequency_report
+
+A frequency report may be requested after data was recieved. The report is returned as a hashref
+cotaining two keys. C<frequency> in kHz and C<count> which represents the number of IR pulses.
+
+=cut
+
+    sub frequency_report {
+        my ($self,%params) = @_;
+
+        $self->write_raw(
+            0x04,   # get frequency report
+        );
+        my $data = $self->read_raw(%params);
+        my @result = _decode_data($data);
+        unless (scalar @result == 4) {
+            fatal('Got invalid frequency report');
+        }
+
+        my $p1 = 1 / ((1/$PIC_CLOCK) * ($result[1]-$result[0]) / 1_000);
+        #my $p2 = 1 / ((1/$PIC_CLOCK) * ($result[2]-$result[1]) / 1_000);
+        return {
+            frequency  => $p1,
+            count      => $result[3],
+        }
+    }
+
+    sub _decode_data {
+        my ($data) = @_;
+        my @return;
+        while (length $data) {
+            my ($hb,$lb) = split (//,substr($data,0,2,''));
+            push(@return,ord($hb)*(2**8)+ord($lb));
+        }
+        return @return;
+    }
+
 =head1 IR PROTOCOLS
 
 Device::IRToy supports pluggable IR protocols for de- and encoding messages.
